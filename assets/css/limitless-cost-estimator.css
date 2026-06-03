@@ -1,0 +1,735 @@
+/* ============================================================
+   Limitless Cost Estimator — Stylesheet
+   ============================================================
+   Poppins is loaded from Google Fonts below.
+   All brand colors are CSS custom properties so the WordPress
+   admin can change them via Settings → Limitless Estimator
+   without touching this file.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
+
+/* ──────────────────────────────────────────────────────────────
+   SCOPED RESET
+   Everything is prefixed with .lce-calculator so we never
+   accidentally override the active WordPress theme's styles.
+   ────────────────────────────────────────────────────────────── */
+.lce-calculator {
+    /* Brand color defaults — overridden by inline <style> injected from PHP */
+    --lce-teal:    #066D7E;
+    --lce-black:   #000000;
+    --lce-white:   #ffffff;
+    --lce-bg:      #F2F2F2;
+    --lce-divider: #E6E6E6;
+
+    font-family:  'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size:    15px;
+    color:        var(--lce-black);
+    background:   var(--lce-bg);
+    padding:      28px 24px 32px;
+    border-radius: 6px;
+    box-sizing:   border-box;
+    line-height:  1.4;
+}
+
+.lce-calculator *,
+.lce-calculator *::before,
+.lce-calculator *::after {
+    box-sizing: inherit;
+}
+
+/* Strip default browser margin/padding from headings, paragraphs,
+   lists so our own spacing is fully in control */
+.lce-calculator h2,
+.lce-calculator h3,
+.lce-calculator h4,
+.lce-calculator p,
+.lce-calculator ul,
+.lce-calculator li {
+    margin:  0;
+    padding: 0;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   CARDS
+   ────────────────────────────────────────────────────────────── */
+.lce-card {
+    background:    var(--lce-white);
+    border-radius: 12px;
+    padding:       28px 24px;
+    box-shadow:    0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* Section titles inside cards: "YOUR DESIGNS", "ESTIMATE SUMMARY" */
+.lce-card-title {
+    font-family:    'Poppins', sans-serif;
+    font-size:      12px;
+    font-weight:    700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color:          var(--lce-teal);
+    margin-bottom:  18px;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   TOP ROW — Designs card (left) + Summary card (right)
+   ────────────────────────────────────────────────────────────── */
+.lce-top-row {
+    display:       flex;
+    gap:           20px;
+    margin-bottom: 28px;
+    align-items:   flex-start;
+}
+
+.lce-designs-card {
+    flex:      1;
+    min-width: 0;
+}
+
+.lce-summary-card {
+    width:       300px;
+    flex-shrink: 0;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   TABLE — scrollable wrapper + header + rows
+   ────────────────────────────────────────────────────────────── */
+
+/* Horizontal scroll container — prevents columns collapsing to zero
+   on narrow screens; user can scroll if the theme is very narrow */
+.lce-table-scroll {
+    overflow-x:                auto;
+    -webkit-overflow-scrolling: touch;
+    /* Negative horizontal margin + matching padding lets the scroll
+       shadow bleed to the card edge while keeping inner alignment */
+    margin:  0 -4px;
+    padding: 0  4px;
+}
+
+/*
+   COLUMN GRID — 7 columns, same template on header AND every design row:
+     34px           → row-number badge
+     minmax(90,1fr) → Width input  (flexible, never below 90px)
+     minmax(90,1fr) → Height input (flexible, never below 90px)
+     105px          → Quantity stepper
+     120px          → Linear Inches
+     150px          → Cost Per Transfer
+     34px           → Delete button
+*/
+.lce-table-header,
+.lce-design-row {
+    display:               grid;
+    grid-template-columns: 34px minmax(90px, 1fr) minmax(90px, 1fr) 105px 120px 150px 34px;
+    gap:                   8px;
+    align-items:           center;
+    padding:               0 2px;
+    min-width:             650px; /* hard floor — triggers scroll below this width */
+}
+
+/* ── Column headers ── */
+.lce-table-header {
+    padding-bottom: 10px;
+    border-bottom:  1.5px solid var(--lce-divider);
+    margin-bottom:  2px;
+}
+
+.lce-table-header span {
+    font-family:  'Poppins', sans-serif;
+    font-size:    12px;
+    font-weight:  600;
+    color:        var(--lce-black);
+    text-align:   center;
+    line-height:  1.3;
+}
+
+.lce-table-header span:first-child,
+.lce-table-header span:last-child {
+    visibility: hidden; /* spacers — keep grid aligned, hide text */
+}
+
+/* ── Design rows ── */
+.lce-design-row {
+    padding-top:    12px;
+    padding-bottom: 12px;
+    border-bottom:  1px solid var(--lce-divider);
+    animation:      lce-row-in 0.18s ease;
+}
+
+.lce-design-row:last-child {
+    border-bottom: none;
+}
+
+@keyframes lce-row-in {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: translateY(0);    }
+}
+
+/* ── Row-number badge (teal circle) ── */
+.lce-row-num {
+    width:           30px;
+    height:          30px;
+    background:      var(--lce-teal);
+    color:           var(--lce-white);
+    border-radius:   50%;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    font-family:     'Poppins', sans-serif;
+    font-size:       13px;
+    font-weight:     700;
+    flex-shrink:     0;
+    justify-self:    center;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   INPUT FIELDS — Width & Height
+   ────────────────────────────────────────────────────────────── */
+.lce-input-wrap {
+    display:       flex;
+    align-items:   center;
+    border:        1.5px solid var(--lce-divider);
+    border-radius: 8px;
+    background:    var(--lce-white);
+    transition:    border-color 0.15s;
+    overflow:      hidden; /* clips border-radius on the inner input */
+}
+
+.lce-input-wrap:focus-within {
+    border-color: var(--lce-teal);
+}
+
+.lce-input-wrap.has-error {
+    border-color: #e04848;
+}
+
+/* The actual <input> inside the width/height wrapper */
+.lce-input {
+    border:      none;
+    outline:     none;
+    padding:     8px 8px 8px 10px;
+    font-family: 'Poppins', sans-serif;
+    font-size:   14px;
+    font-weight: 400;
+    color:       var(--lce-black);
+    width:       100%;
+    background:  transparent;
+    min-width:   0;
+    -moz-appearance: textfield;
+}
+
+.lce-input::-webkit-inner-spin-button,
+.lce-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* "in" unit label inside the input box */
+.lce-input-unit {
+    font-family:   'Poppins', sans-serif;
+    font-size:     12px;
+    color:         #999;
+    padding-right: 8px;
+    white-space:   nowrap;
+    flex-shrink:   0;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   QUANTITY STEPPER
+   ────────────────────────────────────────────────────────────── */
+.lce-qty-wrap {
+    display:       flex;
+    align-items:   stretch;
+    border:        1.5px solid var(--lce-divider);
+    border-radius: 8px;
+    overflow:      hidden;
+    transition:    border-color 0.15s;
+}
+
+.lce-qty-wrap:focus-within {
+    border-color: var(--lce-teal);
+}
+
+.lce-qty-wrap.has-error {
+    border-color: #e04848;
+}
+
+.lce-qty-input {
+    flex:         1;
+    border:       none;
+    outline:      none;
+    text-align:   center;
+    padding:      8px 4px;
+    font-family:  'Poppins', sans-serif;
+    font-size:    14px;
+    font-weight:  400;
+    color:        var(--lce-black);
+    background:   transparent;
+    min-width:    0;
+    -moz-appearance: textfield;
+}
+
+.lce-qty-input::-webkit-inner-spin-button,
+.lce-qty-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+}
+
+/* Up / down arrow column on the right of the qty input */
+.lce-qty-arrows {
+    display:        flex;
+    flex-direction: column;
+    border-left:    1.5px solid var(--lce-divider);
+}
+
+.lce-qty-btn {
+    flex:            1;
+    background:      var(--lce-white);
+    border:          none;
+    cursor:          pointer;
+    padding:         0 7px;
+    color:           #bbb;
+    font-size:       9px;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    line-height:     1;
+    transition:      background 0.12s, color 0.12s;
+}
+
+.lce-qty-btn:hover {
+    background: var(--lce-bg);
+    color:      var(--lce-teal);
+}
+
+.lce-qty-btn + .lce-qty-btn {
+    border-top: 1px solid var(--lce-divider);
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   LINEAR INCHES DISPLAY (read-only, per row)
+   ────────────────────────────────────────────────────────────── */
+.lce-li-display {
+    font-family: 'Poppins', sans-serif;
+    font-size:   14px;
+    font-weight: 500;
+    color:       var(--lce-black);
+    text-align:  center;
+    white-space: nowrap;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   COST-PER-TRANSFER BADGE
+   ────────────────────────────────────────────────────────────── */
+.lce-cost-badge {
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    border-radius:   8px;
+    font-family:     'Poppins', sans-serif;
+    font-size:       15px;
+    font-weight:     700;
+    padding:         10px 8px;
+    background:      var(--lce-divider);
+    color:           #bbb;
+    transition:      background 0.2s, color 0.2s;
+    white-space:     nowrap;
+    letter-spacing:  0.01em;
+}
+
+/* Active — when we have a real cost to show */
+.lce-cost-badge.is-active {
+    background: var(--lce-teal);
+    color:      var(--lce-white);
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   DELETE BUTTON
+   ────────────────────────────────────────────────────────────── */
+.lce-delete-btn {
+    background:      none;
+    border:          none;
+    cursor:          pointer;
+    padding:         5px;
+    color:           #ccc;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    border-radius:   6px;
+    transition:      color 0.15s, background 0.15s;
+    justify-self:    center;
+}
+
+.lce-delete-btn:hover {
+    color:      #e04848;
+    background: rgba(224, 72, 72, 0.08);
+}
+
+.lce-delete-btn svg {
+    display: block;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   ADD ANOTHER DESIGN BUTTON
+   ────────────────────────────────────────────────────────────── */
+.lce-add-btn {
+    width:           100%;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    gap:             16px;
+    padding:         18px 20px;
+    margin-top:      16px;
+    background:      transparent;
+    border:          2px dashed var(--lce-teal);
+    border-radius:   10px;
+    cursor:          pointer;
+    transition:      background 0.18s;
+    text-align:      left;
+}
+
+.lce-add-btn:hover {
+    background: rgba(6, 109, 126, 0.05);
+}
+
+/* Circle "+" icon */
+.lce-add-icon {
+    width:           34px;
+    height:          34px;
+    border:          2px solid var(--lce-teal);
+    border-radius:   50%;
+    color:           var(--lce-teal);
+    font-size:       22px;
+    font-weight:     300;
+    line-height:     1;
+    display:         flex;
+    align-items:     center;
+    justify-content: center;
+    flex-shrink:     0;
+}
+
+.lce-add-text {
+    display:        flex;
+    flex-direction: column;
+    gap:            3px;
+}
+
+.lce-add-label {
+    font-family:    'Poppins', sans-serif;
+    font-size:      13px;
+    font-weight:    700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color:          var(--lce-teal);
+}
+
+.lce-add-sub {
+    font-family: 'Poppins', sans-serif;
+    font-size:   12px;
+    font-weight: 400;
+    color:       #999;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   ESTIMATE SUMMARY CARD
+   ────────────────────────────────────────────────────────────── */
+.lce-summary-block {
+    margin-bottom: 2px;
+}
+
+.lce-summary-label {
+    font-family:   'Poppins', sans-serif;
+    font-size:     13px;
+    font-weight:   500;
+    color:         var(--lce-black);
+    margin-bottom: 4px;
+}
+
+/* Large teal number — Total Linear Inches and Price Per Inch */
+.lce-summary-large {
+    font-family:  'Poppins', sans-serif;
+    font-size:    38px;
+    font-weight:  800;
+    color:        var(--lce-teal);
+    line-height:  1.05;
+    letter-spacing: -0.01em;
+}
+
+/* Even larger — Estimated Total Cost */
+.lce-summary-total {
+    font-family:    'Poppins', sans-serif;
+    font-size:      44px;
+    font-weight:    800;
+    color:          var(--lce-teal);
+    line-height:    1.05;
+    letter-spacing: -0.02em;
+}
+
+/* Tier price + badge side by side */
+.lce-tier-row {
+    display:     flex;
+    align-items: center;
+    gap:         10px;
+    flex-wrap:   wrap;
+}
+
+/* Pill badge: "300″–999″" */
+.lce-tier-badge {
+    background:    var(--lce-teal);
+    color:         var(--lce-white);
+    font-family:   'Poppins', sans-serif;
+    font-size:     11px;
+    font-weight:   600;
+    padding:       4px 11px;
+    border-radius: 20px;
+    display:       none; /* shown by JS */
+    white-space:   nowrap;
+    letter-spacing: 0.02em;
+}
+
+/* Horizontal divider line */
+.lce-divider {
+    height:     1px;
+    background: var(--lce-divider);
+    margin:     18px 0;
+}
+
+/* "All calculations update in real time" */
+.lce-realtime-note {
+    display:     flex;
+    align-items: center;
+    gap:         6px;
+    font-family: 'Poppins', sans-serif;
+    font-size:   12px;
+    font-weight: 400;
+    color:       var(--lce-teal);
+    margin-top:  20px;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   BOTTOM SECTION — Pricing Tiers + Important Notes
+   ────────────────────────────────────────────────────────────── */
+.lce-section-title {
+    font-family:    'Poppins', sans-serif;
+    font-size:      20px;
+    font-weight:    600;
+    text-align:     center;
+    color:          var(--lce-teal);
+    margin-bottom:  20px;
+    letter-spacing: 0.01em;
+}
+
+.lce-bottom-row {
+    display: flex;
+    gap:     20px;
+}
+
+.lce-tiers-card,
+.lce-notes-card {
+    flex: 1;
+}
+
+.lce-tiers-card-title,
+.lce-notes-title {
+    font-family:    'Poppins', sans-serif;
+    font-size:      11px;
+    font-weight:    700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color:          var(--lce-teal);
+    margin-bottom:  14px;
+}
+
+/* ── Tier list ── */
+.lce-tier-list {
+    display:        flex;
+    flex-direction: column;
+}
+
+.lce-tier-item {
+    display:         flex;
+    justify-content: space-between;
+    align-items:     center;
+    padding:         10px 14px;
+    border-radius:   6px;
+    transition:      background 0.15s;
+}
+
+/* Zebra lines between tiers */
+.lce-tier-item + .lce-tier-item {
+    border-top: 1px solid var(--lce-divider);
+}
+
+.lce-tier-range {
+    font-family: 'Poppins', sans-serif;
+    font-size:   14px;
+    font-weight: 400;
+    color:       var(--lce-black);
+}
+
+.lce-tier-price {
+    font-family: 'Poppins', sans-serif;
+    font-size:   14px;
+    font-weight: 600;
+    color:       var(--lce-black);
+}
+
+/* Active tier highlight */
+.lce-tier-item.is-active {
+    background:  var(--lce-teal);
+    border-top:  none;
+    margin-top:  -1px; /* absorb the border-top gap */
+    border-radius: 6px;
+}
+
+/* Remove the divider line just below the active item too */
+.lce-tier-item.is-active + .lce-tier-item {
+    border-top: none;
+    margin-top: 1px;
+}
+
+.lce-tier-item.is-active .lce-tier-range,
+.lce-tier-item.is-active .lce-tier-price {
+    color: var(--lce-white);
+}
+
+/* ── Important Notes ── */
+.lce-notes-list {
+    list-style: none;
+}
+
+.lce-notes-list li {
+    display:       flex;
+    align-items:   flex-start;
+    gap:           12px;
+    padding:       12px 0;
+    font-family:   'Poppins', sans-serif;
+    font-size:     13px;
+    font-weight:   400;
+    color:         var(--lce-black);
+    border-bottom: 1px solid var(--lce-divider);
+    line-height:   1.55;
+}
+
+.lce-notes-list li:last-child {
+    border-bottom: none;
+}
+
+/* Teal circle checkmark icon before each note item */
+.lce-notes-list li::before {
+    content:             '';
+    width:               20px;
+    height:              20px;
+    min-width:           20px;
+    border:              2px solid var(--lce-teal);
+    border-radius:       50%;
+    margin-top:          2px;
+    background-image:    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23066D7E' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+    background-size:     12px 12px;
+    background-position: center;
+    background-repeat:   no-repeat;
+    flex-shrink:         0;
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   RESPONSIVE — TABLET  ≤ 960px
+   Stack summary below designs; tiers and notes stack vertically
+   ────────────────────────────────────────────────────────────── */
+@media (max-width: 960px) {
+
+    .lce-top-row {
+        flex-direction: column;
+    }
+
+    .lce-summary-card {
+        width: 100%;
+    }
+
+    .lce-bottom-row {
+        flex-direction: column;
+    }
+}
+
+
+/* ──────────────────────────────────────────────────────────────
+   RESPONSIVE — MOBILE  ≤ 640px
+   Switch design rows from grid to a wrap-flex card layout
+   ────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+
+    .lce-calculator {
+        padding: 14px 12px 20px;
+    }
+
+    .lce-card {
+        padding: 18px 14px;
+    }
+
+    /* Hide the desktop column header row entirely */
+    .lce-table-header {
+        display: none;
+    }
+
+    /* Let each design row wrap naturally */
+    .lce-design-row {
+        display:   flex;
+        flex-wrap: wrap;
+        gap:       10px;
+        min-width: unset;
+    }
+
+    .lce-row-num {
+        align-self: center;
+        flex-shrink: 0;
+    }
+
+    .lce-input-wrap {
+        flex:      1;
+        min-width: 90px;
+    }
+
+    .lce-qty-wrap {
+        flex:      1;
+        min-width: 90px;
+    }
+
+    .lce-li-display {
+        flex:       1;
+        text-align: left;
+        min-width:  80px;
+        align-self: center;
+    }
+
+    .lce-cost-badge {
+        flex:      1;
+        min-width: 100px;
+    }
+
+    .lce-delete-btn {
+        margin-left: auto;
+        align-self:  center;
+    }
+
+    .lce-summary-large {
+        font-size: 30px;
+    }
+
+    .lce-summary-total {
+        font-size: 36px;
+    }
+
+    .lce-section-title {
+        font-size: 17px;
+    }
+}
