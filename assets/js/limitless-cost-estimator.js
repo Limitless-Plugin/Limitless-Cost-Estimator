@@ -90,16 +90,23 @@
      *                        or Infinity if the design is too wide to fit.
      *
      * HOW IT WORKS:
-     *   cols  = how many designs fit side-by-side across the 22.5" roll.
-     *           Uses Math.floor so we never go over the roll edge.
-     *   rows  = how many row-bands of designs are stacked down the roll.
-     *           Uses Math.ceil so we always fit every copy.
+     *   cols  = how many designs fit side-by-side across the 22.5" roll,
+     *           INCLUDING the 0.25" horizontal gap between each design.
+     *           Formula: n designs need  n×w + (n−1)×GAP  inches of width.
+     *           Solving for n:  n ≤ (ROLL_WIDTH + GAP) / (w + GAP)
+     *           So:  cols = floor( (22.5 + 0.25) / (w + 0.25) )
+     *                     = floor( 22.75 / (w + 0.25) )
+     *
+     *   rows  = how many row-bands are stacked down the roll's length.
+     *           Uses Math.ceil so every copy fits even if the last row is partial.
+     *
      *   li    = rows × (h + GAP)
-     *           Each row of designs takes up (design height + 0.25" gap) of film.
-     *           Math.floor trims the tiny floating-point fractional inch at the end.
+     *           Each row occupies (design height + 0.25" gap) inches of film.
+     *           Returned as a raw float — the TOTAL is ceiled, not each row.
      */
     function calcForOrientation(w, h, qty) {
-        var cols = Math.floor(ROLL_WIDTH / w);
+        // Account for 0.25" gaps between designs horizontally
+        var cols = Math.floor((ROLL_WIDTH + GAP) / (w + GAP));
 
         if (cols < 1) {
             // Design is wider than the roll — cannot fit in this orientation.
@@ -107,7 +114,7 @@
         }
 
         var rows = Math.ceil(qty / cols);
-        var li   = Math.floor(rows * (h + GAP));
+        var li   = rows * (h + GAP); // raw float — total is ceiled later
 
         return li;
     }
@@ -335,8 +342,16 @@
             rowResults.push({ li: li, qty: qty });
         });
 
-        /* ── Step 2: Determine the pricing tier ── */
-        var tier       = getPricingTier(totalLI);
+        /* ── Step 2: Ceil the raw total up to the next whole inch, then look up tier ──
+         *
+         * totalLI is the raw float sum (e.g. 311.5).
+         * billedLI is always a whole number (e.g. 312) — this is what drives
+         * the tier lookup, total cost display, and the big "X in" summary number.
+         * Fractional inches always round UP, never down, so the customer is never
+         * undercharged for film used.
+         */
+        var billedLI   = totalLI > 0 ? Math.ceil(totalLI) : 0;
+        var tier       = getPricingTier(billedLI);
         var pricePerIn = tier ? tier.price : 0;
 
         /* ── Step 3: Write linear inches and cost-per-transfer back to each row ── */
@@ -344,18 +359,18 @@
             var li  = rowResults[i].li;
             var qty = rowResults[i].qty;
 
-            var liDisplay  = qs('.lce-li-display',  row);
-            var costBadge  = qs('.lce-cost-badge', row);
+            var liDisplay = qs('.lce-li-display', row);
+            var costBadge = qs('.lce-cost-badge',  row);
 
             if (li > 0) {
-                /* Display with 2 decimal places to match the mockup style (e.g. "107.00 in") */
+                /* Show each design's raw linear inches to 2 decimal places */
                 liDisplay.textContent = li.toFixed(2) + ' in';
             } else {
                 liDisplay.textContent = '\u2014'; // em dash placeholder
             }
 
             if (li > 0 && qty > 0 && pricePerIn > 0) {
-                /* Cost per transfer = (linear inches for this design × price per inch) ÷ quantity */
+                /* Cost per transfer uses each design's raw LI at the combined tier rate */
                 var costPerTransfer = (li * pricePerIn) / qty;
                 costBadge.textContent = formatMoney(costPerTransfer);
                 costBadge.classList.add('is-active');
@@ -371,19 +386,21 @@
         var tierBadgeEl  = qs('#lce-tier-badge');
         var totalCostEl  = qs('#lce-total-cost');
 
-        totalLIEl.textContent = totalLI > 0 ? totalLI.toFixed(2) + ' in' : '0.00 in';
+        // Display the ceiled whole-number total (e.g. "312 in")
+        totalLIEl.textContent = billedLI > 0 ? billedLI + ' in' : '0 in';
 
         if (tier) {
-            pricePerInEl.textContent    = '$' + tier.price.toFixed(2);
-            tierBadgeEl.textContent     = tier.label;
-            tierBadgeEl.style.display   = 'inline-flex';
+            pricePerInEl.textContent  = '$' + tier.price.toFixed(2);
+            tierBadgeEl.textContent   = tier.label;
+            tierBadgeEl.style.display = 'inline-flex';
         } else {
-            pricePerInEl.textContent    = '$0.00';
-            tierBadgeEl.textContent     = '';
-            tierBadgeEl.style.display   = 'none';
+            pricePerInEl.textContent  = '$0.00';
+            tierBadgeEl.textContent   = '';
+            tierBadgeEl.style.display = 'none';
         }
 
-        var totalCost = totalLI * pricePerIn;
+        // Total cost is based on the ceiled billed total
+        var totalCost = billedLI * pricePerIn;
         totalCostEl.textContent = formatMoney(totalCost);
 
         /* ── Step 5: Highlight the active tier row in the pricing table ── */
@@ -392,6 +409,7 @@
         });
 
         if (tier) {
+            // data-min is set from PRICING_TIERS[].min — match the active tier
             var activeItem = qs('#lce-tier-list .lce-tier-item[data-min="' + tier.min + '"]');
             if (activeItem) {
                 activeItem.classList.add('is-active');
