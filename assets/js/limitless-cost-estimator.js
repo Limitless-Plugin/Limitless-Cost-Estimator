@@ -2,14 +2,14 @@
  * Limitless Cost Estimator — Main JavaScript
  *
  * Responsibilities:
- *  1. Render the default design rows on page load.
+ *  1. Render design rows on page load (starts with one blank row).
  *  2. Let users add / remove / edit design rows.
  *  3. Recalculate everything live whenever any value changes.
  *  4. Render the pricing tier table and highlight the active tier.
  *
- * No external libraries are used — pure vanilla JavaScript.
+ * No external libraries — pure vanilla JavaScript.
  * The entire file is wrapped in an IIFE (Immediately Invoked Function
- * Expression) to keep all our variables private and avoid conflicts
+ * Expression) to keep all variables private and avoid conflicts
  * with the theme or other plugins.
  */
 
@@ -24,38 +24,40 @@
     /** Width of the printable DTF roll in inches. */
     var ROLL_WIDTH = 22.5;
 
-    /** Gap added between (and after) each design row, in inches.
-        Each row on the gang sheet occupies (height + GAP) inches of film. */
+    /** Gap between each design (horizontal AND vertical), in inches. */
     var GAP = 0.25;
 
     /**
-     * Pricing tiers.
-     * min/max are total linear-inch thresholds (inclusive).
+     * Minimum billable linear inches.
+     * Even if the calculated total is only 3", the customer is billed for 12".
+     */
+    var MIN_BILLABLE_LI = 12;
+
+    /**
+     * Pricing tiers — min/max are total billable linear-inch thresholds (inclusive).
      * price is dollars per linear inch.
      */
     var PRICING_TIERS = [
-        { min: 12,    max: 23,         price: 0.99, label: '12\u2033\u201323\u2033'       },
-        { min: 24,    max: 35,         price: 0.88, label: '24\u2033\u201335\u2033'       },
-        { min: 36,    max: 47,         price: 0.84, label: '36\u2033\u201347\u2033'       },
-        { min: 48,    max: 59,         price: 0.77, label: '48\u2033\u201359\u2033'       },
-        { min: 60,    max: 71,         price: 0.70, label: '60\u2033\u201371\u2033'       },
-        { min: 72,    max: 99,         price: 0.66, label: '72\u2033\u201399\u2033'       },
-        { min: 100,   max: 199,        price: 0.61, label: '100\u2033\u2013199\u2033'     },
-        { min: 200,   max: 299,        price: 0.57, label: '200\u2033\u2013299\u2033'     },
-        { min: 300,   max: 999,        price: 0.55, label: '300\u2033\u2013999\u2033'     },
-        { min: 1000,  max: 1999,       price: 0.53, label: '1,000\u2033\u20131,999\u2033' },
-        { min: 2000,  max: 4999,       price: 0.52, label: '2,000\u2033\u20134,999\u2033' },
-        { min: 5000,  max: Infinity,   price: 0.50, label: '5,000\u2033+'                 },
+        { min: 12,    max: 23,       price: 0.99, label: '12\u2033\u201323\u2033'        },
+        { min: 24,    max: 35,       price: 0.88, label: '24\u2033\u201335\u2033'        },
+        { min: 36,    max: 47,       price: 0.84, label: '36\u2033\u201347\u2033'        },
+        { min: 48,    max: 59,       price: 0.77, label: '48\u2033\u201359\u2033'        },
+        { min: 60,    max: 71,       price: 0.70, label: '60\u2033\u201371\u2033'        },
+        { min: 72,    max: 99,       price: 0.66, label: '72\u2033\u201399\u2033'        },
+        { min: 100,   max: 199,      price: 0.61, label: '100\u2033\u2013199\u2033'      },
+        { min: 200,   max: 299,      price: 0.57, label: '200\u2033\u2013299\u2033'      },
+        { min: 300,   max: 999,      price: 0.55, label: '300\u2033\u2013999\u2033'      },
+        { min: 1000,  max: 1999,     price: 0.53, label: '1,000\u2033\u20131,999\u2033'  },
+        { min: 2000,  max: 4999,     price: 0.52, label: '2,000\u2033\u20134,999\u2033'  },
+        { min: 5000,  max: Infinity, price: 0.50, label: '5,000\u2033+'                  },
     ];
 
     /**
-     * Default designs shown on first load (matching the mockup).
-     * Each object has: width, height, qty.
+     * Page starts with one blank row — no preloaded values.
+     * Width, height, and qty are empty strings so the inputs render blank.
      */
     var DEFAULT_DESIGNS = [
-        { width: 11, height: 8,  qty: 25 },
-        { width: 6,  height: 6,  qty: 50 },
-        { width: 10, height: 12, qty: 15 },
+        { width: '', height: '', qty: '' },
     ];
 
 
@@ -78,55 +80,54 @@
        SECTION 3 — CALCULATION ENGINE
        Pure functions — they take numbers in, return numbers out.
        No DOM interaction here, making them easy to test or tweak.
+
+       *** DO NOT change this section without updating the version. ***
        ══════════════════════════════════════════════════════════ */
 
     /**
-     * Calculate the linear inches for ONE orientation of a design.
+     * Calculate the raw linear inches for ONE orientation of a design.
      *
      * @param {number} w    - Width placed across the roll (inches)
      * @param {number} h    - Height placed down the roll / along its length (inches)
      * @param {number} qty  - Number of copies needed
-     * @returns {number}    - Linear inches, floored to nearest whole inch,
-     *                        or Infinity if the design is too wide to fit.
+     * @returns {number}    - Raw float linear inches, or Infinity if the design
+     *                        is too wide to fit on the roll in this orientation.
      *
      * HOW IT WORKS:
      *   cols  = how many designs fit side-by-side across the 22.5" roll,
      *           INCLUDING the 0.25" horizontal gap between each design.
-     *           Formula: n designs need  n×w + (n−1)×GAP  inches of width.
+     *           n designs need  n×w + (n−1)×0.25  inches of width.
      *           Solving for n:  n ≤ (ROLL_WIDTH + GAP) / (w + GAP)
-     *           So:  cols = floor( (22.5 + 0.25) / (w + 0.25) )
-     *                     = floor( 22.75 / (w + 0.25) )
+     *           So:  cols = floor( 22.75 / (w + 0.25) )
      *
      *   rows  = how many row-bands are stacked down the roll's length.
-     *           Uses Math.ceil so every copy fits even if the last row is partial.
+     *           Math.ceil ensures every copy fits even if the last row is partial.
      *
-     *   li    = rows × (h + GAP)
-     *           Each row occupies (design height + 0.25" gap) inches of film.
-     *           Returned as a raw float — the TOTAL is ceiled, not each row.
+     *   rawLinearInches = rows × (h + GAP)
+     *           Each row occupies (height + 0.25") of film.
+     *           Returned as a raw float — rounding happens at the total level.
      */
     function calcForOrientation(w, h, qty) {
-        // Account for 0.25" gaps between designs horizontally
         var cols = Math.floor((ROLL_WIDTH + GAP) / (w + GAP));
 
         if (cols < 1) {
-            // Design is wider than the roll — cannot fit in this orientation.
-            return Infinity;
+            return Infinity; // design wider than the roll in this orientation
         }
 
-        var rows = Math.ceil(qty / cols);
-        var li   = rows * (h + GAP); // raw float — total is ceiled later
+        var rows             = Math.ceil(qty / cols);
+        var rawLinearInches  = rows * (h + GAP);
 
-        return li;
+        return rawLinearInches;
     }
 
     /**
-     * Calculate linear inches for a design, automatically rotating it
-     * 90° if that results in fewer linear inches (i.e., a shorter roll).
+     * Calculate raw linear inches for a design, auto-rotating 90° if that
+     * produces a shorter result.
      *
      * @param {number} width
      * @param {number} height
      * @param {number} qty
-     * @returns {number} Minimum linear inches across both orientations.
+     * @returns {number} Minimum raw linear inches across both orientations.
      */
     function calcDesignLinearInches(width, height, qty) {
         var liNormal  = calcForOrientation(width,  height, qty); // as entered
@@ -135,15 +136,15 @@
     }
 
     /**
-     * Look up the correct pricing tier for a given total linear-inch value.
+     * Look up the pricing tier for a given billable linear-inch value.
      *
-     * @param {number} totalLI
-     * @returns {object|null} The matching tier object, or null if below the minimum.
+     * @param {number} billableLI
+     * @returns {object|null}
      */
-    function getPricingTier(totalLI) {
+    function getPricingTier(billableLI) {
         for (var i = 0; i < PRICING_TIERS.length; i++) {
             var tier = PRICING_TIERS[i];
-            if (totalLI >= tier.min && totalLI <= tier.max) {
+            if (billableLI >= tier.min && billableLI <= tier.max) {
                 return tier;
             }
         }
@@ -151,8 +152,8 @@
     }
 
     /**
-     * Format a number as a dollar amount: $X.XX
-     * Uses Math.round to avoid floating-point weirdness (e.g., 0.1 + 0.2 = 0.30000004).
+     * Format a number as a dollar amount string: "$X.XX"
+     * Uses Math.round to avoid floating-point drift (e.g. 0.1 + 0.2 = 0.30000004).
      *
      * @param {number} value
      * @returns {string}
@@ -164,22 +165,14 @@
 
     /* ══════════════════════════════════════════════════════════
        SECTION 4 — DOM HELPERS
-       Tiny shortcuts so we don't repeat document.querySelector
-       everywhere in the code.
        ══════════════════════════════════════════════════════════ */
 
-    /**
-     * querySelector scoped to a context element (or document by default).
-     * Returns the first matching element or null.
-     */
+    /** querySelector scoped to a context element (or document by default). */
     function qs(selector, context) {
         return (context || document).querySelector(selector);
     }
 
-    /**
-     * Create an element, optionally set its innerHTML, and return it.
-     * (Just a convenience wrapper.)
-     */
+    /** Create an HTML element, optionally set its innerHTML, and return it. */
     function el(tag, html) {
         var node = document.createElement(tag);
         if (html !== undefined) { node.innerHTML = html; }
@@ -189,8 +182,7 @@
 
     /* ══════════════════════════════════════════════════════════
        SECTION 5 — BUILD THE PRICING TIER TABLE
-       Called once on init. Reads from PRICING_TIERS and fills
-       the #lce-tier-list container.
+       Called once on init. Reads PRICING_TIERS and fills #lce-tier-list.
        ══════════════════════════════════════════════════════════ */
 
     function renderPricingTiers() {
@@ -216,64 +208,59 @@
 
     /**
      * Build the HTML for a single design row.
-     * Using innerHTML here keeps things readable and avoids
-     * creating 15+ individual elements with createElement.
      *
      * @param {object} design - { id, width, height, qty }
-     * @param {number} index  - 0-based position in the list (used for the badge number)
+     *                          width/height/qty may be '' (blank) on a new row.
+     * @param {number} index  - 0-based position (used for the badge number)
      * @returns {HTMLElement}
      */
     function buildDesignRow(design, index) {
-        var row = el('div');
-        row.className    = 'lce-design-row';
-        row.dataset.id   = design.id;
+        var row         = el('div');
+        row.className   = 'lce-design-row';
+        row.dataset.id  = design.id;
 
+        // value="" renders a blank input; value="11" renders with the number.
+        // Both are handled correctly — blank inputs just won't contribute to calcs.
         row.innerHTML =
-            /* Row number badge */
             '<span class="lce-row-num">' + (index + 1) + '</span>'
 
-            /* Width input */
           + '<div class="lce-input-wrap">'
           +   '<input class="lce-input lce-width-input"'
           +          ' type="number" value="' + design.width + '"'
           +          ' min="0.01" step="0.01" inputmode="decimal"'
+          +          ' placeholder="0.00"'
           +          ' aria-label="Width in inches">'
           +   '<span class="lce-input-unit">in</span>'
           + '</div>'
 
-            /* Height input */
           + '<div class="lce-input-wrap">'
           +   '<input class="lce-input lce-height-input"'
           +          ' type="number" value="' + design.height + '"'
           +          ' min="0.01" step="0.01" inputmode="decimal"'
+          +          ' placeholder="0.00"'
           +          ' aria-label="Height in inches">'
           +   '<span class="lce-input-unit">in</span>'
           + '</div>'
 
-            /* Quantity stepper */
           + '<div class="lce-qty-wrap">'
           +   '<input class="lce-qty-input"'
           +          ' type="number" value="' + design.qty + '"'
           +          ' min="1" step="1" inputmode="numeric"'
+          +          ' placeholder="0"'
           +          ' aria-label="Quantity">'
           +   '<div class="lce-qty-arrows">'
-          +     '<button class="lce-qty-btn lce-qty-up" type="button" aria-label="Increase quantity">&#9650;</button>'
+          +     '<button class="lce-qty-btn lce-qty-up"   type="button" aria-label="Increase quantity">&#9650;</button>'
           +     '<button class="lce-qty-btn lce-qty-down" type="button" aria-label="Decrease quantity">&#9660;</button>'
           +   '</div>'
           + '</div>'
 
-            /* Linear inches (read-only, updated by JS) */
           + '<span class="lce-li-display" aria-live="polite">\u2014</span>'
-
-            /* Cost per transfer badge (read-only, updated by JS) */
           + '<span class="lce-cost-badge">\u2014</span>'
 
-            /* Delete button */
           + '<button class="lce-delete-btn" type="button" aria-label="Remove design ' + (index + 1) + '">'
           +   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"'
           +        ' stroke="currentColor" stroke-width="2"'
-          +        ' stroke-linecap="round" stroke-linejoin="round"'
-          +        ' aria-hidden="true">'
+          +        ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
           +     '<polyline points="3 6 5 6 21 6"></polyline>'
           +     '<path d="M19 6l-1 14H6L5 6"></path>'
           +     '<path d="M10 11v6M14 11v6"></path>'
@@ -286,14 +273,13 @@
 
     /**
      * Wipe and re-render all design rows from the `designs` array.
-     * After calling this we always call updateAll() to fill in the numbers.
+     * Always followed by updateAll() to recalculate displayed values.
      */
     function renderDesignRows() {
         var container = qs('#lce-design-rows');
         if (!container) { return; }
 
         container.innerHTML = '';
-
         designs.forEach(function (design, index) {
             container.appendChild(buildDesignRow(design, index));
         });
@@ -302,92 +288,151 @@
 
     /* ══════════════════════════════════════════════════════════
        SECTION 7 — MAIN CALCULATION + DISPLAY UPDATE
-       This is called every time any input changes.
-       It reads the DOM, calculates everything, then writes results
-       back to the DOM in one pass.
+
+       Variable naming used throughout this function:
+         rawLinearInches     — float result from calcDesignLinearInches()
+         roundedLinearInches — Math.ceil(rawLinearInches) per design
+         totalRoundedLI      — sum of roundedLinearInches for all valid rows
+         billableLinearInches — max(MIN_BILLABLE_LI, totalRoundedLI)
+                                This is what the customer is charged for.
        ══════════════════════════════════════════════════════════ */
 
     function updateAll() {
 
-        /* ── Step 1: Read current values from every design row ── */
-        var rows       = document.querySelectorAll('#lce-design-rows .lce-design-row');
-        var totalLI    = 0;
-        var rowResults = []; // We'll store per-row li here to use in step 3
+        var domRows    = document.querySelectorAll('#lce-design-rows .lce-design-row');
+        var rowResults = []; // stores per-row calc results for use in display pass
 
-        rows.forEach(function (row) {
+        /* ── Pass 1: Read inputs and calculate per-row linear inches ── */
+        domRows.forEach(function (row) {
             var widthInput  = qs('.lce-width-input',  row);
             var heightInput = qs('.lce-height-input', row);
             var qtyInput    = qs('.lce-qty-input',    row);
-            var widthWrap   = qs('.lce-input-wrap',   row);  // first .lce-input-wrap
             var allWraps    = row.querySelectorAll('.lce-input-wrap');
-            var heightWrap  = allWraps[1];
-            var qtyWrap     = qs('.lce-qty-wrap',     row);
+            var qtyWrap     = qs('.lce-qty-wrap', row);
 
             var width  = parseFloat(widthInput.value)  || 0;
             var height = parseFloat(heightInput.value) || 0;
             var qty    = parseInt(qtyInput.value, 10)  || 0;
 
-            /* Highlight invalid fields in red */
-            toggleError(allWraps[0], width  <= 0);
-            toggleError(allWraps[1], height <= 0);
-            toggleError(qtyWrap,     qty    <= 0);
+            var isValid = width > 0 && height > 0 && qty > 0;
 
-            /* Calculate linear inches for this design */
-            var li = 0;
-            if (width > 0 && height > 0 && qty > 0) {
-                li = calcDesignLinearInches(width, height, qty);
+            // Only show a red border if the user typed something invalid,
+            // not on blank fields (blank = row not yet filled in, which is fine).
+            var widthBlank  = widthInput.value.trim()  === '';
+            var heightBlank = heightInput.value.trim() === '';
+            var qtyBlank    = qtyInput.value.trim()    === '';
+
+            toggleError(allWraps[0], !widthBlank  && width  <= 0);
+            toggleError(allWraps[1], !heightBlank && height <= 0);
+            toggleError(qtyWrap,     !qtyBlank    && qty    <= 0);
+
+            // Only calculate for rows where all three fields have valid values.
+            var rawLinearInches     = 0;
+            var roundedLinearInches = 0;
+
+            if (isValid) {
+                rawLinearInches     = calcDesignLinearInches(width, height, qty);
+                roundedLinearInches = Math.ceil(rawLinearInches);
             }
 
-            totalLI += li;
-            rowResults.push({ li: li, qty: qty });
+            rowResults.push({
+                isValid:             isValid,
+                rawLinearInches:     rawLinearInches,
+                roundedLinearInches: roundedLinearInches,
+                qty:                 qty,
+            });
         });
 
-        /* ── Step 2: Ceil the raw total up to the next whole inch, then look up tier ──
+        /* ── Sum rounded LI across all valid rows ── */
+        var totalRoundedLI = 0;
+        var validRowCount  = 0;
+
+        rowResults.forEach(function (r) {
+            if (r.isValid) {
+                totalRoundedLI += r.roundedLinearInches;
+                validRowCount++;
+            }
+        });
+
+        /* ── Apply 12" minimum to get the billable total ──
          *
-         * totalLI is the raw float sum (e.g. 311.5).
-         * billedLI is always a whole number (e.g. 312) — this is what drives
-         * the tier lookup, total cost display, and the big "X in" summary number.
-         * Fractional inches always round UP, never down, so the customer is never
-         * undercharged for film used.
+         * Regardless of how many designs or how small they are, the customer
+         * is always billed for at least MIN_BILLABLE_LI (12") of film.
+         *
+         *   totalRoundedLI = 0   → no valid rows yet     → billable = 0
+         *   totalRoundedLI = 5   → under 12"             → billable = 12
+         *   totalRoundedLI = 40  → at or above 12"       → billable = 40
          */
-        var billedLI   = totalLI > 0 ? Math.ceil(totalLI) : 0;
-        var tier       = getPricingTier(billedLI);
+        var billableLinearInches = 0;
+        if (totalRoundedLI > 0) {
+            billableLinearInches = Math.max(MIN_BILLABLE_LI, totalRoundedLI);
+        }
+
+        /* ── Tier and total cost are both based on billableLinearInches ── */
+        var tier       = getPricingTier(billableLinearInches);
         var pricePerIn = tier ? tier.price : 0;
+        var totalCost  = billableLinearInches * pricePerIn;
 
-        /* ── Step 3: Write linear inches and cost-per-transfer back to each row ── */
-        rows.forEach(function (row, i) {
-            var li  = rowResults[i].li;
-            var qty = rowResults[i].qty;
-
+        /* ── Pass 2: Write per-row display values ── */
+        domRows.forEach(function (row, i) {
+            var result    = rowResults[i];
             var liDisplay = qs('.lce-li-display', row);
             var costBadge = qs('.lce-cost-badge',  row);
 
-            if (li > 0) {
-                /* Show each design's raw linear inches to 2 decimal places */
-                liDisplay.textContent = li.toFixed(2) + ' in';
-            } else {
-                liDisplay.textContent = '\u2014'; // em dash placeholder
-            }
-
-            if (li > 0 && qty > 0 && pricePerIn > 0) {
-                /* Cost per transfer uses each design's raw LI at the combined tier rate */
-                var costPerTransfer = (li * pricePerIn) / qty;
-                costBadge.textContent = formatMoney(costPerTransfer);
-                costBadge.classList.add('is-active');
-            } else {
+            if (!result.isValid) {
+                // Row is blank or incomplete — show dashes, no error badge
+                liDisplay.textContent = '\u2014';
                 costBadge.textContent = '\u2014';
                 costBadge.classList.remove('is-active');
+                return;
             }
+
+            /* Linear inches display for this row:
+             *   - Normally: show the row's own roundedLinearInches.
+             *   - Special case: if this is the ONLY valid row and its total
+             *     is under the 12" minimum, show 12" so the customer sees
+             *     exactly what they'll be billed for (not the raw 5" or 8").
+             */
+            var displayLI = result.roundedLinearInches;
+            if (validRowCount === 1 && totalRoundedLI < MIN_BILLABLE_LI) {
+                displayLI = MIN_BILLABLE_LI;
+            }
+            liDisplay.textContent = displayLI + ' in';
+
+            /* Cost per transfer:
+             *   Each design pays its proportional share of the total billable cost.
+             *   Formula: (thisRow_roundedLI / totalRoundedLI) × totalCost ÷ qty
+             *
+             *   When there is only one valid row:
+             *     proportion = 100%, so this simplifies to: totalCost / qty
+             *
+             *   When there are multiple valid rows:
+             *     each row pays for its fair share of the billable total.
+             *
+             *   Example (single row, 4"×4", qty 2):
+             *     roundedLI = 5, totalRounded = 5, billable = 12
+             *     totalCost = 12 × $0.99 = $11.88
+             *     costPerTransfer = (5/5) × $11.88 / 2 = $5.94
+             */
+            var costPerTransfer = (result.roundedLinearInches / totalRoundedLI)
+                                  * totalCost
+                                  / result.qty;
+
+            costBadge.textContent = formatMoney(costPerTransfer);
+            costBadge.classList.add('is-active');
         });
 
-        /* ── Step 4: Update the Estimate Summary card ── */
+        /* ── Update the Estimate Summary card ── */
         var totalLIEl    = qs('#lce-total-li');
         var pricePerInEl = qs('#lce-price-per-in');
         var tierBadgeEl  = qs('#lce-tier-badge');
         var totalCostEl  = qs('#lce-total-cost');
 
-        // Display the ceiled whole-number total (e.g. "312 in")
-        totalLIEl.textContent = billedLI > 0 ? billedLI + ' in' : '0 in';
+        if (billableLinearInches > 0) {
+            totalLIEl.textContent = billableLinearInches + ' in';
+        } else {
+            totalLIEl.textContent = '0 in';
+        }
 
         if (tier) {
             pricePerInEl.textContent  = '$' + tier.price.toFixed(2);
@@ -399,36 +444,29 @@
             tierBadgeEl.style.display = 'none';
         }
 
-        // Total cost is based on the ceiled billed total
-        var totalCost = billedLI * pricePerIn;
-        totalCostEl.textContent = formatMoney(totalCost);
+        totalCostEl.textContent = billableLinearInches > 0
+            ? formatMoney(totalCost)
+            : '$0.00';
 
-        /* ── Step 5: Highlight the active tier row in the pricing table ── */
+        /* ── Highlight the active tier row in the pricing table ── */
         document.querySelectorAll('#lce-tier-list .lce-tier-item').forEach(function (item) {
             item.classList.remove('is-active');
         });
 
         if (tier) {
-            // data-min is set from PRICING_TIERS[].min — match the active tier
             var activeItem = qs('#lce-tier-list .lce-tier-item[data-min="' + tier.min + '"]');
-            if (activeItem) {
-                activeItem.classList.add('is-active');
-            }
+            if (activeItem) { activeItem.classList.add('is-active'); }
         }
     }
 
     /**
-     * Add or remove the 'has-error' CSS class on an input wrapper.
+     * Toggle the red 'has-error' border class on an input wrapper.
      * @param {HTMLElement} wrapper
      * @param {boolean}     isError
      */
     function toggleError(wrapper, isError) {
         if (!wrapper) { return; }
-        if (isError) {
-            wrapper.classList.add('has-error');
-        } else {
-            wrapper.classList.remove('has-error');
-        }
+        wrapper.classList.toggle('has-error', isError);
     }
 
 
@@ -438,11 +476,12 @@
 
     /** Add a new blank design row. */
     function handleAddDesign() {
-        designs.push({ id: nextId++, width: 4, height: 4, qty: 1 });
+        // New rows start blank, matching the initial page state.
+        designs.push({ id: nextId++, width: '', height: '', qty: '' });
         renderDesignRows();
         updateAll();
 
-        /* Scroll the new row into view */
+        // Scroll the new row into view
         var rows = document.querySelectorAll('#lce-design-rows .lce-design-row');
         if (rows.length > 0) {
             rows[rows.length - 1].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -450,9 +489,8 @@
     }
 
     /**
-     * Remove a design row.
-     * We keep at least one row so the calculator is never empty.
-     * @param {HTMLElement} rowEl - The .lce-design-row element to remove.
+     * Remove a design row. Keeps at least one row so the calculator is never empty.
+     * @param {HTMLElement} rowEl
      */
     function handleDeleteDesign(rowEl) {
         if (designs.length <= 1) { return; }
@@ -465,32 +503,42 @@
     }
 
     /**
-     * Increment or decrement the quantity for a row.
+     * Step the quantity up or down by delta (+1 or -1).
+     * If the field is currently blank, stepping up starts at 1.
      * @param {HTMLElement} rowEl
-     * @param {number}      delta  - +1 or -1
+     * @param {number}      delta
      */
     function handleQtyStep(rowEl, delta) {
         var input = qs('.lce-qty-input', rowEl);
-        var val   = parseInt(input.value, 10) || 1;
+        var val   = parseInt(input.value, 10) || 0; // treat blank as 0
         input.value = Math.max(1, val + delta);
         updateAll();
     }
 
     /**
-     * Sanitise an input value on change and trigger a recalculation.
-     * Prevents 0, negative numbers, or blank values from being used.
+     * Called on every keystroke in width, height, or qty inputs.
+     * Allows blank fields (= incomplete row, excluded from calculations).
+     * Rejects values that are entered but invalid (e.g. "-5" or "0").
      * @param {HTMLInputElement} input
      */
     function handleInputChange(input) {
+        var raw = input.value.trim();
+
+        if (raw === '') {
+            // Blank is allowed — the row just won't be included in calculations.
+            updateAll();
+            return;
+        }
+
         if (input.classList.contains('lce-qty-input')) {
-            /* Quantity must be a positive integer */
-            var intVal = parseInt(input.value, 10);
+            var intVal = parseInt(raw, 10);
             if (isNaN(intVal) || intVal < 1) { input.value = 1; }
         } else {
-            /* Width / Height must be a positive decimal */
-            var floatVal = parseFloat(input.value);
+            // Width or height
+            var floatVal = parseFloat(raw);
             if (isNaN(floatVal) || floatVal <= 0) { input.value = ''; }
         }
+
         updateAll();
     }
 
@@ -502,33 +550,29 @@
 
     function init() {
 
-        /* Make sure our calculator wrapper exists on this page */
         var calculator = qs('#lce-calculator');
         if (!calculator) { return; }
 
-        /* Build the initial UI */
+        // Build the initial UI — one blank row + tier table
         renderDesignRows();
         renderPricingTiers();
         updateAll();
 
-        /* ── Button: Add Another Design ── */
+        // ── Add Another Design button ──
         var addBtn = qs('#lce-add-design');
         if (addBtn) {
             addBtn.addEventListener('click', handleAddDesign);
         }
 
-        /*
-         * ── Event delegation for design rows ──
-         *
-         * Instead of attaching listeners to every individual input and button,
-         * we attach ONE listener to the rows container and check which element
-         * was actually clicked/changed. This is called "event delegation" and
-         * is more efficient, especially when rows are added/removed dynamically.
-         */
         var rowsContainer = qs('#lce-design-rows');
         if (!rowsContainer) { return; }
 
-        /* Handle text input changes */
+        /*
+         * Event delegation: one listener on the container catches events
+         * from all rows, including rows added dynamically after page load.
+         */
+
+        // Live recalculation on every keystroke
         rowsContainer.addEventListener('input', function (e) {
             var target = e.target;
             if (
@@ -539,79 +583,80 @@
             }
         });
 
-        /* Handle button clicks (delete, qty up, qty down) */
+        // Button clicks: delete row, qty up/down arrows
         rowsContainer.addEventListener('click', function (e) {
             var row = e.target.closest('.lce-design-row');
             if (!row) { return; }
 
-            if (e.target.closest('.lce-delete-btn')) {
-                handleDeleteDesign(row);
-            } else if (e.target.closest('.lce-qty-up')) {
-                handleQtyStep(row, 1);
-            } else if (e.target.closest('.lce-qty-down')) {
-                handleQtyStep(row, -1);
-            }
+            if      (e.target.closest('.lce-delete-btn')) { handleDeleteDesign(row);    }
+            else if (e.target.closest('.lce-qty-up'))     { handleQtyStep(row,  1);     }
+            else if (e.target.closest('.lce-qty-down'))   { handleQtyStep(row, -1);     }
         });
 
-        /* Enforce positive numbers when user leaves an input (blur) */
+        // On blur: clean up any invalid but non-blank value, then sync state
         rowsContainer.addEventListener('blur', function (e) {
             var target = e.target;
+            var raw    = target.value.trim();
+
             if (target.classList.contains('lce-input')) {
-                var val = parseFloat(target.value);
-                if (isNaN(val) || val <= 0) {
-                    /* Restore the last saved value from the designs array */
-                    var row    = target.closest('.lce-design-row');
-                    var id     = row ? parseInt(row.dataset.id, 10) : null;
-                    var design = designs.find(function (d) { return d.id === id; });
-                    if (design) {
-                        if (target.classList.contains('lce-width-input'))  { target.value = design.width; }
-                        if (target.classList.contains('lce-height-input')) { target.value = design.height; }
+                if (raw !== '') {
+                    var val = parseFloat(raw);
+                    if (isNaN(val) || val <= 0) {
+                        target.value = ''; // clear the bad value
                     }
-                    updateAll();
                 }
-                /* Keep designs[] in sync with the inputs */
                 syncStateFromDOM();
+                updateAll();
             }
+
             if (target.classList.contains('lce-qty-input')) {
-                var qtyVal = parseInt(target.value, 10);
-                if (isNaN(qtyVal) || qtyVal < 1) {
-                    target.value = 1;
-                    updateAll();
+                if (raw !== '') {
+                    var qty = parseInt(raw, 10);
+                    if (isNaN(qty) || qty < 1) {
+                        target.value = ''; // clear the bad value
+                    }
                 }
                 syncStateFromDOM();
+                updateAll();
             }
-        }, true /* use capture so blur fires on child inputs */);
+
+        }, true /* capture phase so blur bubbles from child inputs */);
     }
 
     /**
-     * Walk every design row in the DOM and sync the values back into
-     * our `designs` array. This keeps state consistent if we ever need
-     * to read it elsewhere (e.g. for a future "save quote" feature).
+     * Walk every design row in the DOM and sync input values back into
+     * the `designs` state array. Keeps state consistent with what's displayed,
+     * which is useful if we ever need to read state outside of updateAll()
+     * (e.g. a future "save quote" feature).
      */
     function syncStateFromDOM() {
         var rows = document.querySelectorAll('#lce-design-rows .lce-design-row');
+
         rows.forEach(function (row) {
             var id     = parseInt(row.dataset.id, 10);
             var design = designs.find(function (d) { return d.id === id; });
             if (!design) { return; }
 
-            var w = parseFloat(qs('.lce-width-input',  row).value);
-            var h = parseFloat(qs('.lce-height-input', row).value);
-            var q = parseInt(qs('.lce-qty-input', row).value, 10);
+            var wStr = qs('.lce-width-input',  row).value.trim();
+            var hStr = qs('.lce-height-input', row).value.trim();
+            var qStr = qs('.lce-qty-input',    row).value.trim();
 
-            if (w > 0)  { design.width  = w; }
-            if (h > 0)  { design.height = h; }
-            if (q >= 1) { design.qty    = q; }
+            var w = parseFloat(wStr);
+            var h = parseFloat(hStr);
+            var q = parseInt(qStr, 10);
+
+            // Store the value if valid; otherwise store '' (blank)
+            design.width  = (w > 0)  ? w  : '';
+            design.height = (h > 0)  ? h  : '';
+            design.qty    = (q >= 1) ? q  : '';
         });
     }
 
     /* ── Kick things off ── */
     if (document.readyState === 'loading') {
-        /* DOM not ready yet — wait for it */
         document.addEventListener('DOMContentLoaded', init);
     } else {
-        /* DOM already ready (e.g. script loaded in footer) */
-        init();
+        init(); // DOM already ready (script loaded in footer)
     }
 
 })(); // End of IIFE
