@@ -3,7 +3,7 @@
  * Plugin Name:  Limitless Cost Estimator
  * Plugin URI:   https://limitlessbranding.co
  * Description:  A live DTF transfer cost estimator. Add it to any page with the shortcode [limitless_cost_estimator].
- * Version:      1.2.1
+ * Version:      1.2.12
  * Author:       Limitless Branding Co
  * License:      GPL-2.0+
  * Text Domain:  limitless-cost-estimator
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ──────────────────────────────────────────────────────────────
 // Constants — handy shortcuts used throughout the plugin.
 // ──────────────────────────────────────────────────────────────
-define( 'LCE_VERSION',     '1.2.1' );
+define( 'LCE_VERSION',     '1.2.12' );
 define( 'LCE_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );   // URL  to this folder
 define( 'LCE_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );  // Path to this folder
 
