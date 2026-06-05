@@ -34,6 +34,12 @@
     var MIN_BILLABLE_LI = 12;
 
     /**
+     * Free shipping threshold in dollars.
+     * Orders at or above this amount qualify for free shipping.
+     */
+    var FREE_SHIPPING_THRESHOLD = 50.00;
+
+    /**
      * Pricing tiers — min/max are total billable linear-inch thresholds (inclusive).
      * price is dollars per linear inch.
      */
@@ -456,6 +462,50 @@
         if (tier) {
             var activeItem = qs('#lce-tier-list .lce-tier-item[data-min="' + tier.min + '"]');
             if (activeItem) { activeItem.classList.add('is-active'); }
+        }
+
+        /* ── Free shipping area ──────────────────────────────────────────
+         *
+         * Three states based on totalCost:
+         *
+         *   0 (no valid rows)  → hide the whole area
+         *   > 0 and < $50      → show "+ Shipping" + "Add $X.XX more..." note
+         *   >= $50             → show "QUALIFIES FOR FREE SHIPPING!" pill
+         *
+         * No calculation logic here — only display toggling.
+         * ────────────────────────────────────────────────────────────── */
+        var shippingArea  = qs('#lce-shipping-area');
+        var shippingPlus  = qs('#lce-shipping-plus');
+        var shippingNote  = qs('#lce-shipping-note');
+        var freeBadge     = qs('#lce-free-badge');
+
+        if (!shippingArea) { return; } // safety check — elements must exist
+
+        if (billableLinearInches <= 0 || totalCost <= 0) {
+            // State 1: no valid inputs — hide everything
+            shippingArea.style.display = 'none';
+
+        } else if (totalCost >= FREE_SHIPPING_THRESHOLD) {
+            // State 3: qualifies for free shipping
+            shippingArea.style.display  = 'block';
+            shippingPlus.style.display  = 'none';
+            shippingNote.style.display  = 'none';
+            freeBadge.style.display     = 'block';
+
+        } else {
+            // State 2: under $50 — show "+ Shipping" and the "add more" note
+            var amountNeeded = FREE_SHIPPING_THRESHOLD - totalCost;
+
+            shippingArea.style.display  = 'block';
+            shippingPlus.style.display  = 'block';
+            shippingNote.style.display  = 'block';
+            freeBadge.style.display     = 'none';
+
+            // The dollar amount is wrapped in <strong><em> so it renders in
+            // italic bold, matching the style in the reference image.
+            shippingNote.innerHTML = 'Add <strong><em>'
+                + formatMoney(amountNeeded)
+                + '</em></strong> more to qualify for free shipping';
         }
     }
 

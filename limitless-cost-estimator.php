@@ -3,7 +3,7 @@
  * Plugin Name:  Limitless Cost Estimator
  * Plugin URI:   https://limitlessbranding.co
  * Description:  A live DTF transfer cost estimator. Add it to any page with the shortcode [limitless_cost_estimator].
- * Version:      1.2.0
+ * Version:      1.2.1
  * Author:       Limitless Branding Co
  * License:      GPL-2.0+
  * Text Domain:  limitless-cost-estimator
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // ──────────────────────────────────────────────────────────────
 // Constants — handy shortcuts used throughout the plugin.
 // ──────────────────────────────────────────────────────────────
-define( 'LCE_VERSION',     '1.2.0' );
+define( 'LCE_VERSION',     '1.2.1' );
 define( 'LCE_PLUGIN_URL',  plugin_dir_url( __FILE__ ) );   // URL  to this folder
 define( 'LCE_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );  // Path to this folder
 
@@ -166,6 +166,24 @@ function lce_render_calculator() {
                     <p class="lce-summary-label">Estimated Total Cost</p>
                     <p class="lce-summary-value lce-summary-total" id="lce-total-cost">$0.00</p>
                 </div>
+
+                <!-- Free Shipping Area
+                     Visibility and content controlled entirely by JavaScript.
+                     Three possible states:
+                       1. Hidden  — no valid inputs yet
+                       2. Shipping due  — total < $50: shows "+ Shipping" + "Add $X more" note
+                       3. Free shipping — total >= $50: shows the black qualified pill
+                -->
+                <div class="lce-shipping-area" id="lce-shipping-area" style="display:none;" aria-live="polite">
+
+                    <!-- State 2: under $50 -->
+                    <p class="lce-shipping-plus" id="lce-shipping-plus">+ Shipping</p>
+                    <p class="lce-shipping-note" id="lce-shipping-note"></p>
+
+                    <!-- State 3: $50 or more -->
+                    <div class="lce-free-badge" id="lce-free-badge">QUALIFIES FOR FREE SHIPPING!</div>
+
+                </div><!-- /.lce-shipping-area -->
 
                 <p class="lce-realtime-note">
                     <span aria-hidden="true">&#9432;</span>

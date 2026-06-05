@@ -733,3 +733,74 @@
         font-size: 17px;
     }
 }
+
+
+/* ──────────────────────────────────────────────────────────────
+   FREE SHIPPING AREA — sits between Estimated Total Cost and
+   the "All calculations update in real time" note.
+
+   Three states (all toggled by JavaScript, not CSS):
+     1. display:none  — no valid inputs
+     2. Under $50     — .lce-shipping-plus + .lce-shipping-note visible,
+                        .lce-free-badge hidden
+     3. $50+          — .lce-free-badge visible, others hidden
+   ────────────────────────────────────────────────────────────── */
+.lce-shipping-area {
+    margin-top: 12px;
+}
+
+/* "+ Shipping" label shown when total is under $50 */
+.lce-shipping-plus {
+    font-family:  'Poppins', sans-serif;
+    font-size:    15px;
+    font-weight:  600;
+    color:        var(--lce-black);
+    margin:       0 0 5px 0;
+}
+
+/* "Add $X.XX more to qualify for free shipping" */
+.lce-shipping-note {
+    font-family: 'Poppins', sans-serif;
+    font-size:   13px;
+    font-weight: 400;
+    color:       var(--lce-black);
+    margin:      0;
+    line-height: 1.45;
+}
+
+/* Italic bold on the dollar amount inside the note —
+   applied via JS by wrapping the amount in <strong><em>...</em></strong> */
+.lce-shipping-note strong em {
+    font-style: italic;
+}
+
+/* "QUALIFIES FOR FREE SHIPPING!" pill — shown when total >= $50 */
+.lce-free-badge {
+    display:         none; /* shown by JS */
+    width:           100%;
+    padding:         13px 16px;
+    background:      #000000;
+    color:           #ffffff;
+    font-family:     'Poppins', sans-serif;
+    font-size:       13px;
+    font-weight:     700;
+    letter-spacing:  0.06em;
+    text-transform:  uppercase;
+    text-align:      center;
+    border-radius:   30px;
+    box-sizing:      border-box;
+}
+
+/* Mobile: no size change needed — the pill is already full-width */
+@media (max-width: 560px) {
+    .lce-shipping-plus {
+        font-size: 14px;
+    }
+    .lce-shipping-note {
+        font-size: 12px;
+    }
+    .lce-free-badge {
+        font-size: 12px;
+        padding:   11px 14px;
+    }
+}
